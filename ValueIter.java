@@ -3,8 +3,8 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
-
 public class ValueIter {
+    private static final Double EQUALS_CONST = 0.0000001;
     private static HashMap<State, Double> utility;
     private static String[] actions = {"e", "n", "w", "s"};
     private static String[] resultsOfActions = {"e", "n", "w", "s", "h"};
@@ -13,18 +13,42 @@ public class ValueIter {
     private static int depth;
     private static double epsilon;
     private static double gamma;
+    private static String optimalPolicy;
     public static void main(String[] args) {
         states = new ArrayList<>();
         parseMdp(args[0]);
         parseCtr(args[1]);
+        
+        System.out.println("Transition Model:");
+        for(State state: states) {
+            System.out.println("s = (" + state.getXCor() + "," + state.getYCor() + ")");
+            for(String action: actions) {
+                System.out.println("a = " + actionToDirection(action));
+                System.out.println("\t" + state.getProbs().get(action).get("n"));
+                System.out.println(state.getProbs().get(action).get("w") + "\t" + state.getProbs().get(action).get("h") + "\t" + state.getProbs().get(action).get("e"));
+                System.out.println("\t" + state.getProbs().get(action).get("s"));
+            }
+            System.out.print("\n");
+        }
+
         valueIteration();
-        System.out.println("width "+width);
-        System.out.println("depth "+depth);
-        System.out.println("gamma "+gamma);
-        System.out.println("epsilon "+epsilon);
+
+        System.out.println("Optimal policy:");
         for(int i = depth; i > 0; i--){
             for(int j = 1; j <= width; j++){
-                System.out.print(String.format("%.2f", utility.get(getStateByCoords(j,i))) + "\t");
+                State tempState = getStateByCoords(j,i);
+                if(tempState.isTerminal()){
+                    System.out.print(String.format("%.2f", utility.get(getStateByCoords(j,i))) + "\t");
+                } else if(!tempState.isReachable()) {
+                    System.out.print("  \t");
+
+                }else {
+                    max(tempState);
+
+                    System.out.print(optimalPolicy + "\t");
+
+                }
+                
             }
             System.out.print("\n");
         }
@@ -107,6 +131,7 @@ public class ValueIter {
             }
         });
         double del;
+        int round = 1;
         do {
             utility = (HashMap<State, Double>) newUtilities.clone();
             del = 0.0;
@@ -119,13 +144,28 @@ public class ValueIter {
                 }
             }
 
-            System.out.println("depth "+depth);
+            //print state utilities
+            System.out.println("Round " + round + " State Utility (delta = " + String.format("%.7f", del) + "):");
+            for(int i = depth; i > 0; i--){
+                for(int j = 1; j <= width; j++){
+                    State tempState = getStateByCoords(j,i);
+                    if(!tempState.isReachable()) {
+                        System.out.print("  \t");
+                    } else {
+                        System.out.print(String.format("%.2f", utility.get(getStateByCoords(j,i))) + "\t");
+                    } 
+                }
+                System.out.print("\n");
+            }
+            round++;
+
         } while (del >= epsilon);
         return newUtilities;
     }
 
     private static Double max(State state) {
-        double max = 0;
+        double max = Double.NEGATIVE_INFINITY;
+        ArrayList<Double> valArray = new ArrayList<>();
         for(String action: actions) {
             double temp = 0;
             for (String resultDirection: resultsOfActions) {
@@ -134,13 +174,52 @@ public class ValueIter {
                     temp += state.getProbs().get(action).get(resultDirection) * utility.get(destination);
                 }
             }
+            valArray.add(temp);
+
+            //System.out.println("temp: " + temp);
+            //System.out.println("max: " + max);
             if(temp > max) {
+                optimalPolicy = actionToSymbol(action);
                 max = temp;
             }
+
+            
+
         }
-        //System.out.println("max: " + max);
+        if(Math.abs(valArray.get(0) - valArray.get(1)) < EQUALS_CONST && Math.abs(valArray.get(1) - valArray.get(2)) < EQUALS_CONST && Math.abs(valArray.get(2) - valArray.get(3)) < EQUALS_CONST) {
+            optimalPolicy = "+ ";
+        }
         return max;
     }
+
+    private static String actionToSymbol(String action) {
+        String symbol = null;
+        if(action.equals("e")) {
+            symbol = "->";
+        } else if(action.equals("n")){
+            symbol = "^ ";
+        } else if(action.equals("w")){
+            symbol = "<-";
+        } else if(action.equals("s")){
+            symbol = "v ";
+        }
+        return symbol;
+    }
+
+    private static String actionToDirection(String action) {
+        String symbol = null;
+        if(action.equals("e")) {
+            symbol = "right";
+        } else if(action.equals("n")){
+            symbol = "up";
+        } else if(action.equals("w")){
+            symbol = "left";
+        } else if(action.equals("s")){
+            symbol = "down";
+        }
+        return symbol;
+    }
+
 
     private static State stateFromDirection(State startState, String direction) {
         if(direction.equals("e")) {
